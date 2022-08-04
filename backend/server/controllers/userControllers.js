@@ -5,7 +5,7 @@ const colors = require("colors");
 
 //  @desc      Get all blog by user id
 //  @route     '/api/users/register
-//  @access    public
+//  @access    Public
 
 const registerUser = async (req, res, next) => {
   try {
@@ -74,11 +74,110 @@ const registerUser = async (req, res, next) => {
     newUser.password = await bcrypt.hash(password, salt);
     await newUser.save();
 
-    return res.status(200).json(...[newUser]);
+    const payload = {
+      user: {
+        id: newUser._id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      {
+        expiresIn: 28800,
+      },
+      (err, token) => {
+        if (err) throw err;
+        res.json(token);
+      }
+    );
   } catch (error) {
     console.log(`Unknown error occured: \n ${error}`.bgRed);
     res.status(500).send(`Server Error: 505
     \n ${error}`);
+  }
+};
+
+//  @desc      Get all blog by user id
+//  @route     '/api/users/register
+//  @access    Public
+
+const loginUser = async (req, res, next) => {
+  const { email, password } = req.body;
+  let toasts = [];
+
+  if (!password)
+    toasts.push({ message: "A valid password is needed.", type: "error" });
+
+  if (password && (password.length < 6 || password.length > 12)) {
+    toasts.push({
+      message: "Password must be at least 6 - 12 characters long",
+      type: "error",
+    });
+  }
+  if (!email || !validatedEmail(email))
+    toasts.push({ message: "A valid Email is needed", type: "error" });
+
+  if (toasts.length > 0) return res.status(400).json(toasts);
+
+  let user = await User.findOne({ email });
+  if (!user)
+    return res
+      .status(400)
+      .json({ message: "User does not exist", type: "error" });
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
+    return res.status(400).json({
+      message: "Invalid credentials",
+      type: "error",
+    });
+  }
+
+  const payload = {
+    user: {
+      id: user._id,
+    },
+  };
+
+  jwt.sign(
+    payload,
+    process.env.JWT_SECRET,
+    {
+      expiresIn: 28800,
+    },
+    (err, token) => {
+      if (err) throw err;
+      res.json(payload);
+    }
+  );
+};
+
+//  @desc      Get user profile
+//  @route     '/api/users/profile
+//  @access    Private
+const getProfile = async (req, res) => {
+  try {
+    const userId = req.body.user.id;
+
+    if (!userId) {
+      res.status(400).json({ message: "something went worng" });
+    }
+
+    const user = await User.findById(userId)
+      .select("-password")
+      .select("-createdAt")
+      .select("-updatedAt");
+    if (!user)
+      return res
+        .status(404)
+        .json({ message: "User does not exist", type: "error" });
+
+    res.json(user);
+  } catch (error) {
+    console.error(`Error: ${error.message}`.bgRed.underline.bold);
+    res.status(500).send("Something went wrong");
   }
 };
 
@@ -100,4 +199,6 @@ function validatedEmail(email) {
 
 module.exports = {
   registerUser,
+  getProfile,
+  loginUser,
 };
