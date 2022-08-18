@@ -3,8 +3,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const colors = require("colors");
 
-//  @desc      Get all blog by user id
-//  @route     '/api/users/register
+//  @desc      POST  *** REGISTER USER ***
+//  @route     '/api/users/register'
 //  @access    Public
 
 const registerUser = async (req, res, next) => {
@@ -98,60 +98,65 @@ const registerUser = async (req, res, next) => {
   }
 };
 
-//  @desc      Get all blog by user id
-//  @route     '/api/users/register
+//  @desc      POST  *** LOGIN USER ***
+//  @route     '/api/users/register'
 //  @access    Public
 
 const loginUser = async (req, res, next) => {
-  const { email, password } = req.body;
-  let toasts = [];
+  try {
+    const { email, password } = req.body;
+    let toasts = [];
 
-  if (!password)
-    toasts.push({ message: "A valid password is needed.", type: "error" });
+    if (!password)
+      toasts.push({ message: "A valid password is needed.", type: "error" });
 
-  if (password && (password.length < 6 || password.length > 12)) {
-    toasts.push({
-      message: "Password must be at least 6 - 12 characters long",
-      type: "error",
-    });
-  }
-  if (!email || !validatedEmail(email))
-    toasts.push({ message: "A valid Email is needed", type: "error" });
-
-  if (toasts.length > 0) return res.status(400).json(toasts);
-
-  let user = await User.findOne({ email });
-  if (!user)
-    return res
-      .status(400)
-      .json({ message: "User does not exist", type: "error" });
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    return res.status(400).json({
-      message: "Invalid credentials",
-      type: "error",
-    });
-  }
-
-  const payload = {
-    user: {
-      id: user._id,
-    },
-  };
-
-  jwt.sign(
-    payload,
-    process.env.JWT_SECRET,
-    {
-      expiresIn: 28800,
-    },
-    (err, token) => {
-      if (err) throw err;
-      res.json(payload);
+    if (password && (password.length < 6 || password.length > 12)) {
+      toasts.push({
+        message: "Password must be at least 6 - 12 characters long",
+        type: "error",
+      });
     }
-  );
+    if (!email || !validatedEmail(email))
+      toasts.push({ message: "A valid Email is needed", type: "error" });
+
+    if (toasts.length > 0) return res.status(400).json(toasts);
+
+    let user = await User.findOne({ email });
+    if (!user)
+      return res
+        .status(400)
+        .json({ message: "User does not exist", type: "error" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+        type: "error",
+      });
+    }
+
+    const payload = {
+      user: {
+        id: user._id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      {
+        expiresIn: 28800,
+      },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token, payload });
+      }
+    );
+  } catch (error) {
+    console.error(`Error: ${error.message}`.bgRed.underline.bold);
+    res.status(500).send("Server Error");
+  }
 };
 
 //  @desc      Get user profile
